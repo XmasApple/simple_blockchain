@@ -11,19 +11,27 @@ class Block:
         self.payload = payload
         self.nonce = 0
 
+    def __repr__(self):
+        return f'{self.get_hash()}: {self.get_data()}'
+
     def get_data(self) -> bytes:
-        data = {
+        return orjson.dumps({
             "number": self.number,
             "previous": self.previous,
             "payload": self.payload,
             "nonce": self.nonce,
-        }
-        return orjson.dumps(data)
-
-    def __repr__(self):
-        return f'{self.get_hash()}: {self.get_data().decode(encoding="utf-8")}'
+        })
 
     def get_hash(self, nonce: int = None) -> str:
         if nonce is not None:
             self.nonce = nonce
         return hashlib.sha256(self.get_data()).hexdigest()
+
+    def get_block(self):
+        return {
+            "number": self.number,
+            "previous": self.previous,
+            "payload": self.payload,
+            "nonce": self.nonce,
+            "hash": self.get_hash(),
+        }
