@@ -5,8 +5,8 @@ import orjson
 
 
 class Block:
-    def __init__(self, number: int, previous: str = "0" * 64, payload: Any = None) -> None:
-        self.number = number
+    def __init__(self, block_id: int, previous: str = "0" * 64, payload: Any = None) -> None:
+        self.id = block_id
         self.previous = previous
         self.payload = payload
         self.nonce = 0
@@ -16,7 +16,7 @@ class Block:
 
     def get_data(self) -> bytes:
         return orjson.dumps({
-            "number": self.number,
+            "number": self.id,
             "previous": self.previous,
             "payload": self.payload,
             "nonce": self.nonce,
@@ -29,7 +29,7 @@ class Block:
 
     def get_block(self):
         return {
-            "number": self.number,
+            "id": self.id,
             "previous": self.previous,
             "payload": self.payload,
             "nonce": self.nonce,

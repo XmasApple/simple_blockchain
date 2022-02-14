@@ -21,8 +21,8 @@ class Blockchain:
         for block, next_hash in zip(self.blocks, map(lambda x: x.previous, self.blocks[1:])):
             # print(block, next_hash)
             if block.get_hash() != next_hash:
-                print(f"Verification failed at block {block.number}")
-                return block.number
+                print(f"Verification failed at block {block.id}")
+                return block.id
         return -1
 
     def mine_block(self, difficulty: int, payload: Any = None) -> Block:
