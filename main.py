@@ -1,5 +1,8 @@
-from blockchain import Blockchain
+import validators
 from flask import Flask, jsonify, request
+
+from blockchain import Blockchain
+from node import Node
 
 app = Flask(__name__)
 
@@ -39,6 +42,20 @@ def verify_blockchain():
                                                        "block": blockchain.blocks[number]}}), 412
 
 
+@app.route("/connect_nodes", methods={'POST'})
+def connect_nodes():
+    nodes = request.get_json()
+    # print(nodes)
+    if type(nodes) == list and all(map(lambda x: validators.url(f"http://{x}/") is True, nodes)):
+        if len(nodes) > 0:
+            node.connect_nodes(nodes)
+        return jsonify(list(node.nodes)), 201
+    return jsonify({'message': 'some_nodes_has_wrong_url'}), 400
+
+
 if __name__ == '__main__':
     blockchain = Blockchain()
-    app.run(host="localhost", port=80)
+    host = "127.0.0.1"
+    port = int(input())
+    node = Node(f"{host}:{port}")
+    app.run(host=host, port=port)
