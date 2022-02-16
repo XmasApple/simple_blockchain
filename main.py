@@ -17,7 +17,8 @@ def get_block():
         block = blockchain.blocks[int(block_id)]
         return jsonify(block.get_block()), 200
     else:
-        return jsonify({"status": "error", "message": f"wrong id {block_id}"})
+        return jsonify({"status": "error",
+                        "message": f"wrong id {block_id}, chain length = {len(blockchain.blocks)}"}), 400
 
 
 @app.route('/get_blockchain', methods={'GET'})
@@ -35,7 +36,7 @@ def verify_blockchain():
         return jsonify({"status": "success"}), 200
     else:
         return jsonify({"status": "error", "message": {"message": f"wrong block number {number}",
-                                                       "block": blockchain.blocks[number]}}), 409
+                                                       "block": blockchain.blocks[number]}}), 412
 
 
 if __name__ == '__main__':

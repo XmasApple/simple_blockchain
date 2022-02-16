@@ -1,15 +1,16 @@
+from dataclasses import dataclass
 from typing import Any
 
 import hashlib
 import orjson
 
 
+@dataclass
 class Block:
-    def __init__(self, block_id: int, previous: str = "0" * 64, payload: Any = None) -> None:
-        self.id = block_id
-        self.previous = previous
-        self.payload = payload
-        self.nonce = 0
+    id: int = 0
+    previous: str = "0" * 64
+    payload: Any = None
+    nonce: int = 0
 
     def __repr__(self):
         return f'{self.get_hash()}: {self.get_data()}'
