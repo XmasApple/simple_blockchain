@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,26 +15,31 @@ class Block:
     nonce: int = 0
 
     def __repr__(self):
-        return f'{self.get_hash()}: {self.get_data()}'
+        return f'{self.hash}: {self.get_data()}'
 
     def get_data(self) -> bytes:
         return orjson.dumps({
-            "number": self.id,
+            "id": self.id,
             "previous": self.previous,
             "payload": self.payload,
             "nonce": self.nonce,
         })
 
-    def get_hash(self, nonce: int = None) -> str:
+    @property
+    def hash(self, nonce: int = None) -> str:
         if nonce is not None:
             self.nonce = nonce
         return hashlib.sha256(self.get_data()).hexdigest()
 
-    def get_block(self):
+    def get_json(self):
         return {
             "id": self.id,
             "previous": self.previous,
             "payload": self.payload,
             "nonce": self.nonce,
-            "hash": self.get_hash(),
+            "hash": self.hash,
         }
+
+    @staticmethod
+    def from_json(data: dict) -> Block:
+        return Block(data["id"], data["previous"], data["payload"], data["nonce"])

@@ -1,5 +1,4 @@
 import threading
-import time
 from typing import List
 
 import requests
@@ -25,7 +24,7 @@ class Node:
             [t.start() for t in threads]
             # [t.join() for t in threads] # not necessary and too slow for network
 
-    def share_nodes(self, node, nodes: List[str]) -> None:
+    def share_nodes(self, node:str, nodes: List[str]) -> None:
         if node != self.ip:
             for i in range(5):
                 try:
@@ -33,3 +32,6 @@ class Node:
                     break
                 except ConnectionError:
                     pass
+
+    def get_chains(self, nodes: List[str]):
+        pass
