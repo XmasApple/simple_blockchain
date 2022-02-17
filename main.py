@@ -2,7 +2,7 @@ import validators
 from flask import Flask, jsonify, request
 
 from block import Block
-from blockchain import Blockchain
+from blockchain import Blockchain, AddBlockStatus
 from node import Node
 
 app = Flask(__name__)
@@ -60,15 +60,14 @@ def connect_nodes():
 def add_block():
     block = request.get_json()
     if type(block) == dict and all([x in block for x in ["id", "previous", "payload", "nonce"]]):
-        status = blockchain.add_block(Block.from_json(block))
-        if status == 0:
-            return jsonify({'message': 'block added'}), 201
-        elif status == 1:
-            return jsonify({'message:': 'verification failed'}), 409
-        elif status == 2:
-            return jsonify({'message:': f'current chain longer', 'len': len(blockchain)}), 409
-        elif status == 3:
-            return jsonify({'message:': f'current chain to short', 'len': len(blockchain)}), 409
+        switcher = {
+            AddBlockStatus.OK: ({'message': 'block added'}, 201),
+            AddBlockStatus.VERIFICATION_FAILED: ({'message:': 'verification failed'}, 409),
+            AddBlockStatus.CURRENT_CHAIN_LONGER: ({'message:': f'current longer', 'len': len(blockchain)}, 409),
+            AddBlockStatus.CURRENT_CHAIN_TOO_SHORT: ({'message:': f'current too short', 'len': len(blockchain)}, 409),
+        }
+        res = switcher[blockchain.add_block(Block.from_json(block))]
+        return jsonify(res[0]), res[1]
     return jsonify({'message': 'wrong format, block should contain "id", "previous", "payload", "nonce"'}), 400
 
 

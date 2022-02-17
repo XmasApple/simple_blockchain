@@ -1,6 +1,14 @@
 from typing import List, Any
+from enum import Enum, auto
 
 from block import Block
+
+
+class AddBlockStatus(Enum):
+    OK = auto()
+    VERIFICATION_FAILED = auto()
+    CURRENT_CHAIN_LONGER = auto()
+    CURRENT_CHAIN_TOO_SHORT = auto()
 
 
 class Blockchain:
@@ -8,16 +16,16 @@ class Blockchain:
         self.blocks: List[Block] = [Block(0)]
         self.difficulty = 3
 
-    def add_block(self, block: Block) -> int:
+    def add_block(self, block: Block) -> AddBlockStatus:
         if block.id == len(self):
             if block.previous == self.last_hash and block.hash.startswith("0" * self.difficulty):
                 self.blocks.append(block)
-                return 0
+                return AddBlockStatus.OK
             else:
-                return 1
+                return AddBlockStatus.VERIFICATION_FAILED
         elif block.id < len(self):
-            return 2
-        return 3
+            return AddBlockStatus.CURRENT_CHAIN_LONGER
+        return AddBlockStatus.CURRENT_CHAIN_TOO_SHORT
 
     def __len__(self) -> int:
         return len(self.blocks)
