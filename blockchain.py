@@ -1,4 +1,4 @@
-from typing import List, Any
+from typing import List, Any, Optional
 from enum import Enum, auto
 
 from block import Block
@@ -13,7 +13,7 @@ class AddBlockStatus(Enum):
 
 class Blockchain:
     def __init__(self) -> None:
-        self.blocks: List[Block] = [Block(0)]
+        self.blocks: List[Block] = [Block(timestamp=0)]
         self.difficulty = 3
 
     def add_block(self, block: Block) -> AddBlockStatus:
@@ -47,10 +47,10 @@ class Blockchain:
                 return block.id
         return -1
 
-    def mine_block(self, payload: Any = None) -> Block:
-        block = Block(len(self.blocks), self.last_hash, payload)
+    def mine_block(self, payload: Any = None) -> Optional[Block]:
+        block = Block(id=len(self.blocks), previous=self.last_hash, payload=payload)
         while not block.hash.startswith("0" * self.difficulty):
             block.nonce += 1
-
-        print(self.add_block(block))
-        return block
+        if self.add_block(block) == AddBlockStatus.OK:
+            return block
+        return None

@@ -11,7 +11,9 @@ app = Flask(__name__)
 @app.route('/mine_block', methods={'GET'})
 def mine_block():
     block = blockchain.mine_block()
-    return jsonify(block.get_json()), 200
+    if block:
+        return jsonify({'block': vars(block), 'hash': block.hash}), 200
+    return jsonify({'message': 'something went wrong'}), 418
 
 
 @app.route('/get_block', methods={'GET', 'POST'})
@@ -19,7 +21,7 @@ def get_block():
     block_id = request.args.get('id')
     if block_id.isdigit() and int(block_id) < len(blockchain.blocks):
         block = blockchain.blocks[int(block_id)]
-        return jsonify(block.get_json()), 200
+        return jsonify({'block': vars(block), 'hash': block.hash}), 200
     else:
         return jsonify({"status": "error",
                         "message": f"wrong id {block_id}, chain length = {len(blockchain.blocks)}"}), 400
@@ -28,7 +30,7 @@ def get_block():
 @app.route('/get_blockchain', methods={'GET'})
 def get_blockchain():
     return jsonify({
-        "chain": list(map(lambda x: x.get_json(), blockchain.blocks)),
+        "chain": list(map(lambda x: {'block': vars(x), 'hash': x.hash}, blockchain.blocks)),
         "length": len(blockchain.blocks)
     }), 200
 
