@@ -39,6 +39,10 @@ class Blockchain:
     def last_hash(self) -> str:
         return self.last.hash
 
+    @property
+    def hashes(self) -> List[str]:
+        return [block.hash for block in self.blocks]
+
     def verify(self) -> int:
         for block, next_hash in zip(self.blocks, map(lambda x: x.previous, self.blocks[1:])):
             # print(block, next_hash)
