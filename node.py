@@ -72,6 +72,7 @@ class Node:
             nodes = list(self.nodes)
         with ThreadPoolExecutor(len(nodes)) as executor:
             features = [executor.submit(requests.post, f'http://{node}/add_block', json=vars(block)) for node in nodes]
+            print(list(map(lambda x: (x.status_code, x.json()), [feature.result() for feature in features])))
             # failed = list(map(lambda x: x.url.split('/')[2],
             #                   filter(lambda x: x.status_code == 409, map(lambda x: x.result(), features))))
 

@@ -18,7 +18,7 @@ def mine_block():
     block = node.blockchain.mine_block(payload={'transactions': [vars(transaction) for transaction in transactions]})
     if block:
         node.share_block(block)
-        [node.mem_pool.remove(x) for x in transactions]
+        node.mem_pool -= transactions
         return jsonify({'block': vars(block), 'hash': block.hash}), 200
     return jsonify({'message': 'something went wrong'}), 418
 
@@ -69,7 +69,8 @@ def connect_nodes():
 @app.route('/add_block', methods={'POST'})
 def add_block():
     block = request.get_json()
-    if type(block) == dict and all([x in block for x in vars(Block)]):
+    print(block)
+    if type(block) == dict and all([x in block for x in Block.__annotations__]):
         switcher = {
             AddBlockStatus.OK: ({'message': 'block added'}, 201),
             AddBlockStatus.VERIFICATION_FAILED: ({'message:': 'verification failed'}, 409),
@@ -78,11 +79,14 @@ def add_block():
                 {'message:': f'current too short', 'len': len(node.blockchain)}, 409),
         }
         status = node.blockchain.add_block(Block.from_json(block))
-        if status in (AddBlockStatus.VERIFICATION_FAILED, AddBlockStatus.CURRENT_CHAIN_TOO_SHORT):
+        if status == AddBlockStatus.OK:
+            print('remove', set(map(Transaction.from_json, block['payload']['transactions'])))
+            node.mem_pool -= set(map(Transaction.from_json, block['payload']['transactions']))
+        elif status in (AddBlockStatus.VERIFICATION_FAILED, AddBlockStatus.CURRENT_CHAIN_TOO_SHORT):
             node.get_longest_chain()
         res = switcher[status]
         return jsonify(res[0]), res[1]
-    return jsonify({'message': 'wrong format, block should contain \'id\', \'previous\', \'payload\', \'nonce\''}), 400
+    return jsonify({'message': f'wrong format, block should contain {Block.__annotations__.keys()}'}), 400
 
 
 @app.route('/get_blockchain_len', methods={'GET'})
