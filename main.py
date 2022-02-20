@@ -1,18 +1,24 @@
+import time
+
+import requests
 import validators
 from flask import Flask, jsonify, request
 
 from block import Block
 from blockchain import AddBlockStatus
 from node import Node
+from transaction import Transaction
 
 app = Flask(__name__)
 
 
 @app.route('/mine_block', methods={'GET'})
 def mine_block():
-    block = node.blockchain.mine_block()
+    transactions = node.mem_pool
+    block = node.blockchain.mine_block(payload={'transactions': [vars(transaction) for transaction in transactions]})
     if block:
         node.share_block(block)
+        [node.mem_pool.remove(x) for x in transactions]
         return jsonify({'block': vars(block), 'hash': block.hash}), 200
     return jsonify({'message': 'something went wrong'}), 418
 
@@ -88,6 +94,23 @@ def get_blockchain_len():
 @app.route('/get_blockchain_hashes', methods={'GET'})
 def get_blockchain_hashes():
     return jsonify(node.blockchain.hashes), 200
+
+
+@app.route('/add_transaction', methods={'POST'})
+def add_transaction():
+    transaction = request.json
+    if 'timestamp' not in transaction:
+        transaction['timestamp'] = time.time()
+    if type(transaction) == dict and all([x in transaction for x in Transaction.__annotations__]):
+        node.add_transaction(Transaction.from_json(transaction))
+        return jsonify('ok'), 201
+    return jsonify({'message': 'error'}), 400
+
+
+@app.route('/get_transactions', methods={'GET'})
+def get_transactions():
+    mem_pool = list(node.mem_pool)
+    return jsonify({'transactions': mem_pool, 'count': len(mem_pool)}), 200
 
 
 if __name__ == '__main__':

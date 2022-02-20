@@ -5,14 +5,15 @@ import requests
 
 from block import Block
 from blockchain import Blockchain
+from transaction import Transaction
 
 
 class Node:
     def __init__(self, ip: str):
-        self.ip = ip
-        self.blockchain = Blockchain()
+        self.ip: str = ip
+        self.blockchain: Blockchain = Blockchain()
         self.nodes: set = set()
-        self.mem_pool = []
+        self.mem_pool: set[Transaction] = set()
 
     def connect_nodes(self, nodes: List[str]) -> None:
         olds = [self.ip] + list(self.nodes)
@@ -66,10 +67,19 @@ class Node:
 
         return False
 
-    def share_block(self, block, nodes: List[str] = None) -> None:
+    def share_block(self, block: Block, nodes: List[str] = None) -> None:
         if not nodes:
             nodes = list(self.nodes)
         with ThreadPoolExecutor(len(nodes)) as executor:
             features = [executor.submit(requests.post, f'http://{node}/add_block', json=vars(block)) for node in nodes]
-            failed = list(map(lambda x: x.url.split('/')[2],
-                              filter(lambda x: x.status_code == 409, map(lambda x: x.result(), features))))
+            # failed = list(map(lambda x: x.url.split('/')[2],
+            #                   filter(lambda x: x.status_code == 409, map(lambda x: x.result(), features))))
+
+    def add_transaction(self, transaction: Transaction) -> bool:
+        if transaction not in self.mem_pool:
+            self.mem_pool.add(transaction)
+            nodes = list(self.nodes)
+            with ThreadPoolExecutor(len(nodes)) as executor:
+                features = [executor.submit(requests.post, f'http://{node}/add_transaction', json=vars(transaction)) for node in nodes]
+                return True
+        return False
