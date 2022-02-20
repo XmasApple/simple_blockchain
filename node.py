@@ -27,7 +27,8 @@ class Node:
                 futures = [executor.submit(self.share_nodes, *args) for args in inputs]
                 [f.result() for f in futures]
                 # [f.result() for f in futures]  # not necessary and too slow for network
-        self.get_longest_chain()
+        with ThreadPoolExecutor(len(nodes)) as executor:
+            executor.submit(self.get_longest_chain)
 
     def share_nodes(self, node: str, nodes: List[str]) -> bool:
         if node != self.ip:
@@ -42,25 +43,33 @@ class Node:
     def get_longest_chain(self, nodes: List[str] = None) -> bool:
         if not nodes:
             nodes = list(self.nodes)
-            with ThreadPoolExecutor(len(nodes)) as executor:
-                futures = [executor.submit(requests.get, f'http://{node}/get_blockchain_len') for node in nodes]
-                lens = [future.result().json() for future in futures]
-                print(lens)
-                print(nodes)
-                longest = max(lens)
-                longest_node = nodes[lens.index(longest)]
-                print(longest_node)
-                print(longest, len(self.blockchain))
-                if longest > len(self.blockchain):
-                    hashes = requests.get(f'http://{longest_node}/get_blockchain_hashes').json()
-                    start = 0
-                    for i, (a, b) in enumerate(zip(hashes, self.blockchain.hashes)):
-                        if a != b:
-                            start = i
-                            break
-                    blockchain_data = requests.get(f'http://{longest_node}/get_blockchain?start={start}').json()
-                    self.blockchain.blocks = [Block(block_data['block']) for block_data in
-                                              blockchain_data['chain']]
-                    return True
+        with ThreadPoolExecutor(len(nodes)) as executor:
+            futures = [executor.submit(requests.get, f'http://{node}/get_blockchain_len') for node in nodes]
+            lens = [future.result().json() for future in futures]
+            print(lens)
+            print(nodes)
+            longest = max(lens)
+            longest_node = nodes[lens.index(longest)]
+            print(longest_node)
+            print(longest, len(self.blockchain))
+            if longest > len(self.blockchain):
+                hashes = requests.get(f'http://{longest_node}/get_blockchain_hashes').json()
+                start = 0
+                for i, (a, b) in enumerate(zip(hashes, self.blockchain.hashes)):
+                    if a != b:
+                        start = i
+                        break
+                blockchain_data = requests.get(f'http://{longest_node}/get_blockchain?start={start}').json()
+                self.blockchain.blocks = [Block(block_data['block']) for block_data in
+                                          blockchain_data['chain']]
+                return True
 
         return False
+
+    def share_block(self, block, nodes: List[str] = None) -> None:
+        if not nodes:
+            nodes = list(self.nodes)
+        with ThreadPoolExecutor(len(nodes)) as executor:
+            features = [executor.submit(requests.post, f'http://{node}/add_block', json=vars(block)) for node in nodes]
+            failed = list(map(lambda x: x.url.split('/')[2],
+                              filter(lambda x: x.status_code == 409, map(lambda x: x.result(), features))))

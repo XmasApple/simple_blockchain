@@ -24,6 +24,8 @@ class Blockchain:
             else:
                 return AddBlockStatus.VERIFICATION_FAILED
         elif block.id < len(self):
+            if block.id == len(self) - 1:
+                return AddBlockStatus.OK
             return AddBlockStatus.CURRENT_CHAIN_LONGER
         return AddBlockStatus.CURRENT_CHAIN_TOO_SHORT
 

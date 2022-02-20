@@ -12,6 +12,7 @@ app = Flask(__name__)
 def mine_block():
     block = node.blockchain.mine_block()
     if block:
+        node.share_block(block)
         return jsonify({'block': vars(block), 'hash': block.hash}), 200
     return jsonify({'message': 'something went wrong'}), 418
 
@@ -70,13 +71,17 @@ def add_block():
             AddBlockStatus.CURRENT_CHAIN_TOO_SHORT: (
                 {'message:': f'current too short', 'len': len(node.blockchain)}, 409),
         }
-        res = switcher[node.blockchain.add_block(Block.from_json(block))]
+        status = node.blockchain.add_block(Block.from_json(block))
+        if status in (AddBlockStatus.VERIFICATION_FAILED, AddBlockStatus.CURRENT_CHAIN_TOO_SHORT):
+            node.get_longest_chain()
+        res = switcher[status]
         return jsonify(res[0]), res[1]
     return jsonify({'message': 'wrong format, block should contain \'id\', \'previous\', \'payload\', \'nonce\''}), 400
 
 
 @app.route('/get_blockchain_len', methods={'GET'})
 def get_blockchain_len():
+    print(request.remote_addr, request.environ["REMOTE_PORT"])
     return jsonify(len(node.blockchain)), 200
 
 
