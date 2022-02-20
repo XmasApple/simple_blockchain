@@ -1,3 +1,4 @@
+import time
 from typing import List, Any, Optional
 from enum import Enum, auto
 
@@ -14,7 +15,7 @@ class AddBlockStatus(Enum):
 class Blockchain:
     def __init__(self) -> None:
         self.blocks: List[Block] = [Block(timestamp=0)]
-        self.difficulty = 3
+        self.difficulty = 5
 
     def add_block(self, block: Block) -> AddBlockStatus:
         if block.id == len(self):
@@ -55,6 +56,7 @@ class Blockchain:
 
     def mine_block(self, payload: Any = None) -> Optional[Block]:
         block = Block(id=len(self.blocks), previous=self.last_hash, payload=payload)
+        block.timestamp = int(time.time())
         while not block.hash.startswith("0" * self.difficulty):
             block.nonce += 1
         if self.add_block(block) == AddBlockStatus.OK:

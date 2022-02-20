@@ -1,5 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
-from typing import List
+from typing import List, Any
 
 import requests
 
@@ -14,6 +14,28 @@ class Node:
         self.blockchain: Blockchain = Blockchain()
         self.nodes: set = set()
         self.mem_pool: set[Transaction] = set()
+
+    def broadcast_get(self, route: str, nodes: List[str] = None) -> List:
+        if not nodes:
+            nodes = list(self.nodes)
+        if self.ip in nodes:
+            nodes.remove(self.ip)
+        if len(nodes) > 0:
+            with ThreadPoolExecutor(len(nodes)) as executor:
+                futures = [executor.submit(requests.get, f'http://{node}/{route}') for node in nodes]
+                return futures
+        return []
+
+    def broadcast_post(self, route: str, json: Any = None, nodes: List[str] = None) -> List:
+        if not nodes:
+            nodes = list(self.nodes)
+        if self.ip in nodes:
+            nodes.remove(self.ip)
+        if len(nodes) > 0:
+            with ThreadPoolExecutor(len(nodes)) as executor:
+                futures = [executor.submit(requests.post, f'http://{node}/{route}', json=json) for node in nodes]
+                return futures
+        return []
 
     def connect_nodes(self, nodes: List[str]) -> None:
         olds = [self.ip] + list(self.nodes)
@@ -44,43 +66,32 @@ class Node:
     def get_longest_chain(self, nodes: List[str] = None) -> bool:
         if not nodes:
             nodes = list(self.nodes)
-        with ThreadPoolExecutor(len(nodes)) as executor:
-            futures = [executor.submit(requests.get, f'http://{node}/get_blockchain_len') for node in nodes]
-            lens = [future.result().json() for future in futures]
-            print(lens)
-            print(nodes)
-            longest = max(lens)
-            longest_node = nodes[lens.index(longest)]
-            print(longest_node)
-            print(longest, len(self.blockchain))
-            if longest > len(self.blockchain):
-                hashes = requests.get(f'http://{longest_node}/get_blockchain_hashes').json()
-                start = 0
-                for i, (a, b) in enumerate(zip(hashes, self.blockchain.hashes)):
-                    if a != b:
-                        start = i
-                        break
-                blockchain_data = requests.get(f'http://{longest_node}/get_blockchain?start={start}').json()
-                self.blockchain.blocks = [Block(block_data['block']) for block_data in
-                                          blockchain_data['chain']]
-                return True
-
+        futures = self.broadcast_get('/get_blockchain_len', nodes)
+        lens = [future.result().json() for future in futures]
+        longest = max(lens)
+        longest_node = nodes[lens.index(longest)]
+        if longest > len(self.blockchain):
+            hashes = requests.get(f'http://{longest_node}/get_blockchain_hashes').json()
+            start = 0
+            for i, (a, b) in enumerate(zip(hashes, self.blockchain.hashes)):
+                if a != b:
+                    start = i
+                    break
+            blockchain_data = requests.get(f'http://{longest_node}/get_blockchain?start={start}').json()
+            self.blockchain.blocks = [Block.from_json(block_data['block']) for block_data in
+                                      blockchain_data['chain']]
+            return True
         return False
 
     def share_block(self, block: Block, nodes: List[str] = None) -> None:
-        if not nodes:
-            nodes = list(self.nodes)
-        with ThreadPoolExecutor(len(nodes)) as executor:
-            features = [executor.submit(requests.post, f'http://{node}/add_block', json=vars(block)) for node in nodes]
-            print(list(map(lambda x: (x.status_code, x.json()), [feature.result() for feature in features])))
-            # failed = list(map(lambda x: x.url.split('/')[2],
-            #                   filter(lambda x: x.status_code == 409, map(lambda x: x.result(), features))))
+        futures = self.broadcast_post('/add_block', vars(block), nodes)
+        print(list(map(lambda x: (x.status_code, x.json()), [futures.result() for futures in futures])))
+        # failed = list(map(lambda x: x.url.split('/')[2],
+        #                   filter(lambda x: x.status_code == 409, map(lambda x: x.result(), futures))))
 
     def add_transaction(self, transaction: Transaction) -> bool:
-        if transaction not in self.mem_pool:
-            self.mem_pool.add(transaction)
-            nodes = list(self.nodes)
-            with ThreadPoolExecutor(len(nodes)) as executor:
-                features = [executor.submit(requests.post, f'http://{node}/add_transaction', json=vars(transaction)) for node in nodes]
-                return True
-        return False
+        if transaction in self.mem_pool:
+            return False
+        self.mem_pool.add(transaction)
+        futures = self.broadcast_post('/add_transaction', vars(transaction))
+        return True
