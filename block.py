@@ -1,11 +1,10 @@
 from __future__ import annotations
+
 from typing import Any
 from dataclasses import dataclass
-import time
 
 import hashlib
 import orjson
-
 
 @dataclass(order=True)
 class Block:
@@ -44,4 +43,3 @@ class Block:
         block = Block(**data)
         print(block)
         return block
-

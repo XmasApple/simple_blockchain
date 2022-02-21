@@ -1,8 +1,5 @@
-import threading
 import time
-from threading import Thread
 
-import requests
 import validators
 from flask import Flask, jsonify, request
 
@@ -12,19 +9,6 @@ from node import Node
 from transaction import Transaction
 
 app = Flask(__name__)
-
-
-def mine():
-    print(0)
-    time.sleep(3)
-    print(10)
-    while True:
-        print('loop')
-        transactions = node.mem_pool
-        block = node.blockchain.mine_block(payload={'transactions': [vars(transaction) for transaction in transactions]})
-        if block:
-            node.share_block(block)
-            node.mem_pool -= transactions
 
 
 @app.route('/get_block', methods={'GET', 'POST'})
@@ -38,7 +22,23 @@ def get_block():
                         'message': f'wrong id {block_id}, chain length = {len(node.blockchain.blocks)}'}), 400
 
 
-@app.route('/get_blockchain', methods={'GET'})
+@app.route('/get_last_block', methods={'GET', 'POST'})
+def get_last_block():
+    block = node.blockchain.blocks[-1]
+    return jsonify({'block': vars(block), 'hash': block.hash}), 200
+
+
+@app.route('/get_mem_pool', methods={'GET', 'POST'})
+def get_mem_pool():
+    return jsonify(list(node.mem_pool)), 200
+
+
+@app.route('/get_blockchain_difficulty', methods={'GET', 'POST'})
+def get_blockchain_difficulty():
+    return jsonify({'difficulty': node.blockchain.difficulty}), 200
+
+
+@app.route('/get_blockchain', methods={'GET', 'POST'})
 def get_blockchain():
     start = request.args.get('start', 0, int)
     return jsonify({
@@ -47,7 +47,7 @@ def get_blockchain():
     }), 200
 
 
-@app.route('/verify_blockchain', methods={'GET'})
+@app.route('/verify_blockchain', methods={'GET', 'POST'})
 def verify_blockchain():
     number = node.blockchain.verify()
     if number == -1:
@@ -57,7 +57,7 @@ def verify_blockchain():
                                                        'block': node.blockchain.blocks[number]}}), 412
 
 
-@app.route('/get_connected_nodes', methods={'GET'})
+@app.route('/get_connected_nodes', methods={'GET', 'POST'})
 def get_connected_nodes():
     return jsonify(len(node.blockchain)), 200
 
@@ -88,6 +88,8 @@ def add_block():
         }
         status = node.blockchain.add_block(Block.from_json(block))
         if status == AddBlockStatus.OK:
+            print(set(map(Transaction.from_json, block['payload']['transactions'])))
+            print(node.mem_pool)
             node.mem_pool -= set(map(Transaction.from_json, block['payload']['transactions']))
         elif status in (AddBlockStatus.VERIFICATION_FAILED, AddBlockStatus.CURRENT_CHAIN_TOO_SHORT):
             node.get_longest_chain()
@@ -96,12 +98,12 @@ def add_block():
     return jsonify({'message': f'wrong format, block should contain {Block.__annotations__.keys()}'}), 400
 
 
-@app.route('/get_blockchain_len', methods={'GET'})
+@app.route('/get_blockchain_len', methods={'GET', 'POST'})
 def get_blockchain_len():
     return jsonify(len(node.blockchain)), 200
 
 
-@app.route('/get_blockchain_hashes', methods={'GET'})
+@app.route('/get_blockchain_hashes', methods={'GET', 'POST'})
 def get_blockchain_hashes():
     return jsonify(node.blockchain.hashes), 200
 
@@ -117,7 +119,7 @@ def add_transaction():
     return jsonify({'message': 'error'}), 400
 
 
-@app.route('/get_transactions', methods={'GET'})
+@app.route('/get_transactions', methods={'GET', 'POST'})
 def get_transactions():
     mem_pool = list(node.mem_pool)
     return jsonify({'transactions': mem_pool, 'count': len(mem_pool)}), 200
@@ -127,7 +129,4 @@ if __name__ == '__main__':
     host = '127.0.0.1'
     port = int(input())
     node = Node(f'{host}:{port}')
-    print(1)
-    threading.Thread(target=mine).start()
-    print(3)
     app.run(host=host, port=port)

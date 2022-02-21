@@ -53,12 +53,3 @@ class Blockchain:
                 print(f"Verification failed at block {block.id}")
                 return block.id
         return -1
-
-    def mine_block(self, payload: Any = None) -> Optional[Block]:
-        block = Block(id=len(self.blocks), previous=self.last_hash, payload=payload)
-        block.timestamp = int(time.time())
-        while not block.hash.startswith("0" * self.difficulty):
-            block.nonce += 1
-        if self.add_block(block) == AddBlockStatus.OK:
-            return block
-        return None

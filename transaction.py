@@ -6,9 +6,9 @@ from dataclasses import dataclass
 
 @dataclass(order=True)
 class Transaction:
-    sender: str
-    receiver: str
     amount: int
+    receiver: str
+    sender: str
     timestamp: int = int(time.time())
 
     @staticmethod
