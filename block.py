@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from typing import Any
-from dataclasses import dataclass
 
 import hashlib
 import orjson
+from pydantic import BaseModel
 
-@dataclass(order=True)
-class Block:
+
+class Block(BaseModel):
     id: int = 0
     nonce: int = 0
     payload: Any = None

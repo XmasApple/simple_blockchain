@@ -1,6 +1,5 @@
-import time
-from typing import List, Any, Optional
 from enum import Enum, auto
+from typing import List
 
 from block import Block
 

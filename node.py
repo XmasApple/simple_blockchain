@@ -1,4 +1,4 @@
-from concurrent.futures import ProcessPoolExecutor, Future
+from concurrent.futures import ThreadPoolExecutor, Future
 from typing import List, Any
 
 import requests
@@ -21,7 +21,7 @@ class Node:
         if self.ip in nodes:
             nodes.remove(self.ip)
         if len(nodes) > 0:
-            with ProcessPoolExecutor(len(nodes)) as executor:
+            with ThreadPoolExecutor(len(nodes)) as executor:
                 futures = [executor.submit(requests.get, f'http://{node}/{route}') for node in nodes]
                 return futures
         return []
@@ -32,7 +32,7 @@ class Node:
         if self.ip in nodes:
             nodes.remove(self.ip)
         if len(nodes) > 0:
-            with ProcessPoolExecutor(len(nodes)) as executor:
+            with ThreadPoolExecutor(len(nodes)) as executor:
                 futures = [executor.submit(requests.post, f'http://{node}/{route}', json=json) for node in nodes]
                 return futures
         return []
@@ -46,11 +46,11 @@ class Node:
                 self.nodes.add(node)
         inputs = [(node, olds + news) for node in news] + [(node, news) for node in olds]
         if len(news) > 1 or (len(news) > 0 and self.ip in news):
-            with ProcessPoolExecutor(len(inputs)) as executor:
+            with ThreadPoolExecutor(len(inputs)) as executor:
                 futures = [executor.submit(self.share_nodes, *args) for args in inputs]
                 [f.result() for f in futures]
                 # [f.result() for f in futures]  # not necessary and too slow for network
-        with ProcessPoolExecutor(len(nodes)) as executor:
+        with ThreadPoolExecutor(len(nodes)) as executor:
             executor.submit(self.get_longest_chain)
 
     def share_nodes(self, node: str, nodes: List[str]) -> bool:

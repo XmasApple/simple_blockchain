@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+
+from pydantic import BaseModel
 
 
-@dataclass(order=True)
-class Transaction:
-    amount: int
-    receiver: str
+class Transaction(BaseModel):
     sender: str
+    receiver: str
+    amount: int
     timestamp: int = int(time.time())
 
     @staticmethod
     def from_json(data: dict) -> Transaction:
-        transaction = Transaction(*data.values())
+        transaction = Transaction(**data)
         if type(transaction.timestamp) == float:
             transaction.timestamp = int(transaction.timestamp)
         return transaction

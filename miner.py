@@ -1,5 +1,5 @@
 from typing import Any, List
-from concurrent.futures import ProcessPoolExecutor, Future
+from concurrent.futures import ThreadPoolExecutor, Future
 
 import time
 import requests
@@ -11,7 +11,7 @@ nodes = ["127.0.0.1:5000", "127.0.0.1:5001"]
 
 def broadcast_get(route: str) -> List[Future]:
     if len(nodes) > 0:
-        with ProcessPoolExecutor(len(nodes)) as executor:
+        with ThreadPoolExecutor(len(nodes)) as executor:
             futures = [executor.submit(requests.get, f'http://{node}/{route}') for node in nodes]
             return futures
     return []
@@ -19,7 +19,7 @@ def broadcast_get(route: str) -> List[Future]:
 
 def broadcast_post(route: str, json: Any) -> List[Future]:
     if len(nodes) > 0:
-        with ProcessPoolExecutor(len(nodes)) as executor:
+        with ThreadPoolExecutor(len(nodes)) as executor:
             futures = [executor.submit(requests.post, f'http://{node}/{route}', json=json) for node in nodes]
             return futures
     return []

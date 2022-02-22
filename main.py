@@ -1,132 +1,128 @@
 import time
+from typing import List
 
 import validators
-from flask import Flask, jsonify, request
+from fastapi import FastAPI, HTTPException
+import uvicorn
 
 from block import Block
 from blockchain import AddBlockStatus
 from node import Node
 from transaction import Transaction
 
-app = Flask(__name__)
+app = FastAPI()
 
 
-@app.route('/get_block', methods={'GET', 'POST'})
-def get_block():
-    block_id = request.args.get('id', type=int)
+@app.get('/get_block')
+def get_block(block_id: int = 0):
     if block_id and int(block_id) < len(node.blockchain.blocks):
         block = node.blockchain.blocks[int(block_id)]
-        return jsonify({'block': vars(block), 'hash': block.hash}), 200
+        return {'block': vars(block), 'hash': block.hash}
     else:
-        return jsonify({'status': 'error',
-                        'message': f'wrong id {block_id}, chain length = {len(node.blockchain.blocks)}'}), 400
+        raise HTTPException(status_code=400,
+                            detail={'status': 'error',
+                                    'message': f'wrong id {block_id}, chain length = {len(node.blockchain.blocks)}'})
 
 
-@app.route('/get_last_block', methods={'GET', 'POST'})
+@app.get('/get_last_block')
 def get_last_block():
     block = node.blockchain.blocks[-1]
-    return jsonify({'block': vars(block), 'hash': block.hash}), 200
+    return {'block': vars(block), 'hash': block.hash}
 
 
-@app.route('/get_mem_pool', methods={'GET', 'POST'})
+@app.get('/get_mem_pool')
 def get_mem_pool():
-    return jsonify(list(node.mem_pool)), 200
+    return list(node.mem_pool)
 
 
-@app.route('/get_blockchain_difficulty', methods={'GET', 'POST'})
+@app.get('/get_blockchain_difficulty')
 def get_blockchain_difficulty():
-    return jsonify({'difficulty': node.blockchain.difficulty}), 200
+    return {'difficulty': node.blockchain.difficulty}
 
 
-@app.route('/get_blockchain', methods={'GET', 'POST'})
-def get_blockchain():
-    start = request.args.get('start', 0, int)
-    return jsonify({
+@app.get('/get_blockchain')
+def get_blockchain(start: int = 0):
+    return {
         'chain': list(map(lambda x: {'block': vars(x), 'hash': x.hash}, node.blockchain.blocks[start:])),
         'length': len(node.blockchain.blocks)
-    }), 200
+    }
 
 
-@app.route('/verify_blockchain', methods={'GET', 'POST'})
+@app.get('/verify_blockchain')
 def verify_blockchain():
     number = node.blockchain.verify()
     if number == -1:
-        return jsonify({'status': 'success'}), 200
+        return {'status': 'success'}
     else:
-        return jsonify({'status': 'error', 'message': {'message': f'wrong block number {number}',
-                                                       'block': node.blockchain.blocks[number]}}), 412
+        raise HTTPException(status_code=412,
+                            detail={'status': 'error', 'message': {'message': f'wrong block number {number}',
+                                                                   'block': node.blockchain.blocks[number]}})
 
 
-@app.route('/get_connected_nodes', methods={'GET', 'POST'})
+@app.get('/get_connected_nodes')
 def get_connected_nodes():
-    return jsonify(len(node.blockchain)), 200
+    return len(node.blockchain)
 
 
-@app.route('/connect_nodes', methods={'POST'})
-def connect_nodes():
-    nodes = request.get_json()
+@app.post('/connect_nodes', status_code=201)
+def connect_nodes(nodes: List[str]):
     # print(nodes)
     if type(nodes) == list and all(map(
             lambda x: type(x) == str and validators.url(x if x.startswith('http://') else f'http://{x}/') is True,
             nodes)):
         if len(nodes) > 0:
             node.connect_nodes(nodes)
-        return jsonify(list(node.nodes)), 201
-    return jsonify({'message': 'some_nodes_has_wrong_url'}), 400
+        return list(node.nodes)
+    raise HTTPException(status_code=400, detail={'message': 'some_nodes_has_wrong_url'})
 
 
-@app.route('/add_block', methods={'POST'})
-def add_block():
-    block = request.get_json()
-    if type(block) == dict and all([x in block for x in Block.__annotations__]):
-        switcher = {
-            AddBlockStatus.OK: ({'message': 'block added'}, 201),
-            AddBlockStatus.VERIFICATION_FAILED: ({'message:': 'verification failed'}, 409),
-            AddBlockStatus.CURRENT_CHAIN_LONGER: ({'message:': f'current longer', 'len': len(node.blockchain)}, 409),
-            AddBlockStatus.CURRENT_CHAIN_TOO_SHORT: (
-                {'message:': f'current too short', 'len': len(node.blockchain)}, 409),
-        }
-        status = node.blockchain.add_block(Block.from_json(block))
-        if status == AddBlockStatus.OK:
-            print(set(map(Transaction.from_json, block['payload']['transactions'])))
-            print(node.mem_pool)
-            node.mem_pool -= set(map(Transaction.from_json, block['payload']['transactions']))
-        elif status in (AddBlockStatus.VERIFICATION_FAILED, AddBlockStatus.CURRENT_CHAIN_TOO_SHORT):
-            node.get_longest_chain()
-        res = switcher[status]
-        return jsonify(res[0]), res[1]
-    return jsonify({'message': f'wrong format, block should contain {Block.__annotations__.keys()}'}), 400
+@app.post('/add_block', status_code=201)
+def add_block(block: Block):
+    switcher = {
+        AddBlockStatus.OK: ({'message': 'block added'}, 201),
+        AddBlockStatus.VERIFICATION_FAILED: ({'message:': 'verification failed'}, 409),
+        AddBlockStatus.CURRENT_CHAIN_LONGER: ({'message:': f'current longer', 'len': len(node.blockchain)}, 409),
+        AddBlockStatus.CURRENT_CHAIN_TOO_SHORT: (
+            {'message:': f'current too short', 'len': len(node.blockchain)}, 409),
+    }
+    status = node.blockchain.add_block(block)
+    if status == AddBlockStatus.OK:
+        print(block.payload['transactions'])
+        node.mem_pool -= set(map(Transaction.from_json, block.payload['transactions']))
+    elif status in (AddBlockStatus.VERIFICATION_FAILED, AddBlockStatus.CURRENT_CHAIN_TOO_SHORT):
+        node.get_longest_chain()
+    res = switcher[status]
+    if res[1] == 201:
+        return res[0]
+    raise HTTPException(status_code=res[1], detail=res[1])
 
 
-@app.route('/get_blockchain_len', methods={'GET', 'POST'})
+@app.get('/get_blockchain_len')
 def get_blockchain_len():
-    return jsonify(len(node.blockchain)), 200
+    return len(node.blockchain)
 
 
-@app.route('/get_blockchain_hashes', methods={'GET', 'POST'})
+@app.get('/get_blockchain_hashes')
 def get_blockchain_hashes():
-    return jsonify(node.blockchain.hashes), 200
+    return node.blockchain.hashes
 
 
-@app.route('/add_transaction', methods={'POST'})
-def add_transaction():
-    transaction = request.json
-    if 'timestamp' not in transaction:
-        transaction['timestamp'] = time.time()
-    if type(transaction) == dict and all([x in transaction for x in Transaction.__annotations__]):
-        node.add_transaction(Transaction.from_json(transaction))
-        return jsonify('ok'), 201
-    return jsonify({'message': 'error'}), 400
+@app.post('/add_transaction', status_code=201)
+def add_transaction(transaction: Transaction):
+    if transaction.timestamp == 0:
+        transaction.timestamp = time.time()
+    node.add_transaction(transaction)
+    return 'ok'
 
 
-@app.route('/get_transactions', methods={'GET', 'POST'})
+@app.get('/get_transactions')
 def get_transactions():
     mem_pool = list(node.mem_pool)
-    return jsonify({'transactions': mem_pool, 'count': len(mem_pool)}), 200
+    return {'transactions': mem_pool, 'count': len(mem_pool)}
 
 
 if __name__ == '__main__':
     host = '127.0.0.1'
     port = int(input())
     node = Node(f'{host}:{port}')
-    app.run(host=host, port=port)
+    uvicorn.run(app, host=host, port=port, log_level="info")
