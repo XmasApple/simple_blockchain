@@ -45,10 +45,9 @@ class Node:
                 news.append(node)
                 self.nodes.add(node)
         inputs = [(node, olds + news) for node in news] + [(node, news) for node in olds]
-        if len(news) > 1 or (len(news) > 0 and self.ip in news):
+        if len(news) > 1 or (len(news) > 0 and self.ip not in news):
             with ThreadPoolExecutor(len(inputs)) as executor:
                 futures = [executor.submit(self.share_nodes, *args) for args in inputs]
-                [f.result() for f in futures]
                 # [f.result() for f in futures]  # not necessary and too slow for network
         with ThreadPoolExecutor(len(nodes)) as executor:
             executor.submit(self.get_longest_chain)
@@ -84,6 +83,7 @@ class Node:
         return False
 
     def share_block(self, block: Block, nodes: List[str] = None) -> None:
+        print('share')
         futures = self.broadcast_post('add_block', vars(block), nodes)
         print(list(map(lambda x: (x.status_code, x.json()), [futures.result() for futures in futures])))
         # failed = list(map(lambda x: x.url.split('/')[2],
@@ -93,5 +93,5 @@ class Node:
         if transaction in self.mem_pool:
             return False
         self.mem_pool.add(transaction)
-        futures = self.broadcast_post('add_transaction', vars(transaction))
+        self.broadcast_post('add_transaction', vars(transaction))
         return True

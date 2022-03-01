@@ -1,3 +1,4 @@
+import socket
 from typing import Any, List
 from concurrent.futures import ThreadPoolExecutor, Future
 
@@ -6,7 +7,10 @@ import requests
 
 from block import Block
 
-nodes = ["127.0.0.1:5000", "127.0.0.1:5001"]
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.connect(("8.8.8.8", 80))
+nodes = [f"{s.getsockname()[0]}:5000"]
+s.close()
 
 
 def broadcast_get(route: str) -> List[Future]:

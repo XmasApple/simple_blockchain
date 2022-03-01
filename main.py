@@ -1,9 +1,10 @@
+import socket
 import time
 from typing import List
 
+import uvicorn
 import validators
 from fastapi import FastAPI, HTTPException
-import uvicorn
 
 from block import Block
 from blockchain import AddBlockStatus
@@ -61,12 +62,12 @@ def verify_blockchain():
 
 @app.get('/get_connected_nodes')
 def get_connected_nodes():
-    return len(node.blockchain)
+    return node.nodes
 
 
 @app.post('/connect_nodes', status_code=201)
 def connect_nodes(nodes: List[str]):
-    # print(nodes)
+    print(nodes)
     if type(nodes) == list and all(map(
             lambda x: type(x) == str and validators.url(x if x.startswith('http://') else f'http://{x}/') is True,
             nodes)):
@@ -80,6 +81,7 @@ def connect_nodes(nodes: List[str]):
 def add_block(block: Block):
     switcher = {
         AddBlockStatus.OK: ({'message': 'block added'}, 201),
+        AddBlockStatus.EXIST: ({'message': 'block exist'}, 201),
         AddBlockStatus.VERIFICATION_FAILED: ({'message:': 'verification failed'}, 409),
         AddBlockStatus.CURRENT_CHAIN_LONGER: ({'message:': f'current longer', 'len': len(node.blockchain)}, 409),
         AddBlockStatus.CURRENT_CHAIN_TOO_SHORT: (
@@ -88,13 +90,14 @@ def add_block(block: Block):
     status = node.blockchain.add_block(block)
     if status == AddBlockStatus.OK:
         print(block.payload['transactions'])
+        node.share_block(block)
         node.mem_pool -= set(map(Transaction.from_json, block.payload['transactions']))
     elif status in (AddBlockStatus.VERIFICATION_FAILED, AddBlockStatus.CURRENT_CHAIN_TOO_SHORT):
         node.get_longest_chain()
     res = switcher[status]
     if res[1] == 201:
         return res[0]
-    raise HTTPException(status_code=res[1], detail=res[1])
+    raise HTTPException(status_code=res[1], detail=res[0])
 
 
 @app.get('/get_blockchain_len')
@@ -122,7 +125,10 @@ def get_transactions():
 
 
 if __name__ == '__main__':
-    host = '127.0.0.1'
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    host = s.getsockname()[0]
+    s.close()
     port = int(input())
     node = Node(f'{host}:{port}')
     uvicorn.run(app, host=host, port=port, log_level="info")
