@@ -14,7 +14,7 @@ from transaction import Transaction
 app = FastAPI()
 
 
-@app.get('/get_block')
+@app.get('/get_block', tags=['Blockchain'])
 def get_block(block_id: int = 0):
     if block_id and int(block_id) < len(node.blockchain.blocks):
         block = node.blockchain.blocks[int(block_id)]
@@ -25,23 +25,18 @@ def get_block(block_id: int = 0):
                                     'message': f'wrong id {block_id}, chain length = {len(node.blockchain.blocks)}'})
 
 
-@app.get('/get_last_block')
+@app.get('/get_last_block', tags=['Blockchain'])
 def get_last_block():
     block = node.blockchain.blocks[-1]
     return {'block': vars(block), 'hash': block.hash}
 
 
-@app.get('/get_mem_pool')
-def get_mem_pool():
-    return list(node.mem_pool)
-
-
-@app.get('/get_blockchain_difficulty')
+@app.get('/get_blockchain_difficulty', tags=['Blockchain'])
 def get_blockchain_difficulty():
     return {'difficulty': node.blockchain.difficulty}
 
 
-@app.get('/get_blockchain')
+@app.get('/get_blockchain', tags=['Blockchain'])
 def get_blockchain(start: int = 0):
     return {
         'chain': list(map(lambda x: {'block': vars(x), 'hash': x.hash}, node.blockchain.blocks[start:])),
@@ -49,7 +44,7 @@ def get_blockchain(start: int = 0):
     }
 
 
-@app.get('/verify_blockchain')
+@app.get('/verify_blockchain', tags=['Blockchain'])
 def verify_blockchain():
     number = node.blockchain.verify()
     if number == -1:
@@ -60,24 +55,7 @@ def verify_blockchain():
                                                                    'block': node.blockchain.blocks[number]}})
 
 
-@app.get('/get_connected_nodes')
-def get_connected_nodes():
-    return node.nodes
-
-
-@app.post('/connect_nodes', status_code=201)
-def connect_nodes(nodes: List[str]):
-    print(nodes)
-    if type(nodes) == list and all(map(
-            lambda x: type(x) == str and validators.url(x if x.startswith('http://') else f'http://{x}/') is True,
-            nodes)):
-        if len(nodes) > 0:
-            node.connect_nodes(nodes)
-        return list(node.nodes)
-    raise HTTPException(status_code=400, detail={'message': 'some_nodes_has_wrong_url'})
-
-
-@app.post('/add_block', status_code=201)
+@app.post('/add_block', status_code=201, tags=['Blockchain'])
 def add_block(block: Block):
     switcher = {
         AddBlockStatus.OK: ({'message': 'block added'}, 201),
@@ -100,17 +78,17 @@ def add_block(block: Block):
     raise HTTPException(status_code=res[1], detail=res[0])
 
 
-@app.get('/get_blockchain_len')
+@app.get('/get_blockchain_len', tags=['Blockchain'])
 def get_blockchain_len():
     return len(node.blockchain)
 
 
-@app.get('/get_blockchain_hashes')
+@app.get('/get_blockchain_hashes', tags=['Blockchain'])
 def get_blockchain_hashes():
     return node.blockchain.hashes
 
 
-@app.post('/add_transaction', status_code=201)
+@app.post('/add_transaction', status_code=201, tags=['Transactions'])
 def add_transaction(transaction: Transaction):
     if transaction.timestamp == 0:
         transaction.timestamp = time.time()
@@ -118,10 +96,32 @@ def add_transaction(transaction: Transaction):
     return 'ok'
 
 
-@app.get('/get_transactions')
+@app.get('/get_transactions', tags=['Transactions'])
 def get_transactions():
     mem_pool = list(node.mem_pool)
     return {'transactions': mem_pool, 'count': len(mem_pool)}
+
+
+@app.get('/get_connected_nodes', tags=['Node'])
+def get_connected_nodes():
+    return node.nodes
+
+
+@app.post('/connect_nodes', status_code=201, tags=['Node'])
+def connect_nodes(nodes: List[str]):
+    print(nodes)
+    if type(nodes) == list and all(map(
+            lambda x: type(x) == str and validators.url(x if x.startswith('http://') else f'http://{x}/') is True,
+            nodes)):
+        if len(nodes) > 0:
+            node.connect_nodes(nodes)
+        return list(node.nodes)
+    raise HTTPException(status_code=400, detail={'message': 'some_nodes_has_wrong_url'})
+
+
+@app.get('/get_mem_pool', tags=['Transactions'])
+def get_mem_pool():
+    return list(node.mem_pool)
 
 
 if __name__ == '__main__':
