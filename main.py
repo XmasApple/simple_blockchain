@@ -18,7 +18,7 @@ app = FastAPI()
 def get_block(block_id: int = 0):
     if block_id and int(block_id) < len(node.blockchain.blocks):
         block = node.blockchain.blocks[int(block_id)]
-        return {'block': vars(block), 'hash': block.hash}
+        return {'block': block.dict(), 'hash': block.hash}
     else:
         raise HTTPException(status_code=400,
                             detail={'status': 'error',
@@ -28,7 +28,7 @@ def get_block(block_id: int = 0):
 @app.get('/get_last_block', tags=['Blockchain'])
 def get_last_block():
     block = node.blockchain.blocks[-1]
-    return {'block': vars(block), 'hash': block.hash}
+    return {'block': block.dict(), 'hash': block.hash}
 
 
 @app.get('/get_blockchain_difficulty', tags=['Blockchain'])
@@ -39,7 +39,7 @@ def get_blockchain_difficulty():
 @app.get('/get_blockchain', tags=['Blockchain'])
 def get_blockchain(start: int = 0):
     return {
-        'chain': list(map(lambda x: {'block': vars(x), 'hash': x.hash}, node.blockchain.blocks[start:])),
+        'chain': list(map(lambda x: {'block': x.dict(), 'hash': x.hash}, node.blockchain.blocks[start:])),
         'length': len(node.blockchain.blocks)
     }
 
@@ -69,7 +69,7 @@ def add_block(block: Block):
     if status == AddBlockStatus.OK:
         print(block.payload['transactions'])
         node.share_block(block)
-        node.mem_pool -= set(map(Transaction.from_json, block.payload['transactions']))
+        node.mem_pool -= set(map(Transaction.parse_obj, block.payload['transactions']))
     elif status in (AddBlockStatus.VERIFICATION_FAILED, AddBlockStatus.CURRENT_CHAIN_TOO_SHORT):
         node.get_longest_chain()
     res = switcher[status]

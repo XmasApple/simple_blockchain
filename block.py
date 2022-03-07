@@ -3,11 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 import hashlib
-import orjson
-from pydantic import BaseModel
+from model import Model
 
 
-class Block(BaseModel):
+class Block(Model):
     id: int = 0
     nonce: int = 0
     payload: Any = None
@@ -18,13 +17,7 @@ class Block(BaseModel):
         if type(self.id) != int:
             print('id not int', self.id)
             assert type(self.id) == int
-        return f'{self.hash}: {self.get_data()}'
-
-    def get_data(self) -> bytes:
-        if type(self.id) != int:
-            print('id not int', self.id)
-            assert type(self.id) == int
-        return orjson.dumps(vars(self))
+        return f'{self.hash}: {self.dict()}'
 
     @property
     def hash(self, nonce: int = None) -> str:
@@ -33,13 +26,4 @@ class Block(BaseModel):
             assert type(self.id) == int
         if nonce is not None:
             self.nonce = nonce
-        return hashlib.sha256(self.get_data()).hexdigest()
-
-    @staticmethod
-    def from_json(data: dict) -> Block:
-        if type(data['id']) != int:
-            print('id not int', data)
-            assert type(data['id']) == int
-        block = Block(**data)
-        print(block)
-        return block
+        return hashlib.sha256(self.json().encode(encoding='utf-8')).hexdigest()

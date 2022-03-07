@@ -40,10 +40,9 @@ class Node:
     def connect_nodes(self, nodes: List[str]) -> None:
         olds = [self.ip] + list(self.nodes)
         news = []
-        for node in nodes:
-            if node not in self.nodes:
-                news.append(node)
-                self.nodes.add(node)
+        for node in [node for node in nodes if node not in self.nodes]:
+            news.append(node)
+            self.nodes.add(node)
         inputs = [(node, olds + news) for node in news] + [(node, news) for node in olds]
         if len(news) > 1 or (len(news) > 0 and self.ip not in news):
             with ThreadPoolExecutor(len(inputs)) as executor:
@@ -77,7 +76,7 @@ class Node:
                     start = i
                     break
             blockchain_data = requests.get(f'http://{longest_node}/get_blockchain?start={start}').json()
-            self.blockchain.blocks = [Block.from_json(block_data['block']) for block_data in
+            self.blockchain.blocks = [Block.parse_obj(block_data['block']) for block_data in
                                       blockchain_data['chain']]
             return True
         return False
