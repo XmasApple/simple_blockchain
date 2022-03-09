@@ -1,5 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, Future
-from typing import List, Any
+from typing import List, Any, Set
 
 import requests
 
@@ -11,13 +11,13 @@ from transaction import Transaction
 class Node:
     def __init__(self, ip: str):
         self.ip: str = ip
+        self.nodes: Set[str] = set()
         self.blockchain: Blockchain = Blockchain()
-        self.nodes: set = set()
-        self.mem_pool: set[Transaction] = set()
+        self.mem_pool: Set[Transaction] = set()
 
     def broadcast_get(self, route: str, nodes: List[str] = None) -> List[Future]:
         if not nodes:
-            nodes = list(self.nodes)
+            nodes = self.node_list
         if self.ip in nodes:
             nodes.remove(self.ip)
         if len(nodes) > 0:
@@ -28,7 +28,7 @@ class Node:
 
     def broadcast_post(self, route: str, json: Any = None, nodes: List[str] = None) -> List[Future]:
         if not nodes:
-            nodes = list(self.nodes)
+            nodes = self.node_list
         if self.ip in nodes:
             nodes.remove(self.ip)
         if len(nodes) > 0:
@@ -38,7 +38,7 @@ class Node:
         return []
 
     def connect_nodes(self, nodes: List[str]) -> None:
-        olds = [self.ip] + list(self.nodes)
+        olds = [self.ip] + self.node_list
         news = []
         for node in [node for node in nodes if node not in self.nodes]:
             news.append(node)
@@ -63,7 +63,7 @@ class Node:
 
     def get_longest_chain(self, nodes: List[str] = None) -> bool:
         if not nodes:
-            nodes = list(self.nodes)
+            nodes = self.node_list
         futures = self.broadcast_get('get_blockchain_len', nodes)
         lens = [future.result().json() for future in futures]
         longest = max(lens)
@@ -83,7 +83,7 @@ class Node:
 
     def share_block(self, block: Block, nodes: List[str] = None) -> None:
         print('share')
-        futures = self.broadcast_post('add_block', vars(block), nodes)
+        futures = self.broadcast_post('add_block', block.dict(), nodes)
         print(list(map(lambda x: (x.status_code, x.json()), [futures.result() for futures in futures])))
         # failed = list(map(lambda x: x.url.split('/')[2],
         #                   filter(lambda x: x.status_code == 409, map(lambda x: x.result(), futures))))
@@ -94,3 +94,15 @@ class Node:
         self.mem_pool.add(transaction)
         self.broadcast_post('add_transaction', vars(transaction))
         return True
+
+    @property
+    def blockchain_len(self) -> int:
+        return len(self.blockchain)
+
+    @property
+    def node_list(self) -> List[str]:
+        return list(self.nodes)
+
+    @property
+    def mem_pool_list(self) -> List[Transaction]:
+        return list(self.mem_pool)

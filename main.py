@@ -7,9 +7,9 @@ import validators
 from fastapi import FastAPI, HTTPException
 
 from block import Block
+from transaction import Transaction
 from blockchain import AddBlockStatus
 from node import Node
-from transaction import Transaction
 
 app = FastAPI()
 
@@ -63,7 +63,7 @@ def add_block(block: Block):
         AddBlockStatus.VERIFICATION_FAILED: ({'message:': 'verification failed'}, 409),
         AddBlockStatus.CURRENT_CHAIN_LONGER: ({'message:': f'current longer', 'len': len(node.blockchain)}, 409),
         AddBlockStatus.CURRENT_CHAIN_TOO_SHORT: (
-            {'message:': f'current too short', 'len': len(node.blockchain)}, 409),
+            {'message:': f'current too short', 'len': node.blockchain_len}, 409),
     }
     status = node.blockchain.add_block(block)
     if status == AddBlockStatus.OK:
@@ -80,7 +80,7 @@ def add_block(block: Block):
 
 @app.get('/get_blockchain_len', tags=['Blockchain'])
 def get_blockchain_len():
-    return len(node.blockchain)
+    return node.blockchain_len
 
 
 @app.get('/get_blockchain_hashes', tags=['Blockchain'])
@@ -115,13 +115,13 @@ def connect_nodes(nodes: List[str]):
             nodes)):
         if len(nodes) > 0:
             node.connect_nodes(nodes)
-        return list(node.nodes)
+        return node.node_list
     raise HTTPException(status_code=400, detail={'message': 'some_nodes_has_wrong_url'})
 
 
 @app.get('/get_mem_pool', tags=['Transactions'])
 def get_mem_pool():
-    return list(node.mem_pool)
+    return node.mem_pool_list
 
 
 if __name__ == '__main__':

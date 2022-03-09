@@ -15,7 +15,7 @@ class AddBlockStatus(Enum):
 class Blockchain:
     def __init__(self) -> None:
         self.blocks: List[Block] = [Block(timestamp=0)]
-        self.difficulty = 5
+        self.difficulty: int = 5
 
     def add_block(self, block: Block) -> AddBlockStatus:
         if block.id == len(self):
