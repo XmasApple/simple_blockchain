@@ -14,17 +14,20 @@ from blockchain import AddBlockStatus
 from ws_node import WsNode
 
 
-async def send(ws, data):
+async def send(ws, _type: str, data: Any = None):
     try:
-        print('O', data)
-        await ws.send(orjson.dumps(data))
+        msg = {'type': _type}
+        if data is not None:
+            msg['data'] = data
+        print('O', msg)
+        await ws.send(orjson.dumps(msg))
     except websockets.ConnectionClosed:
         pass
 
 
-async def handler(ws, path):
-    await send(ws, {'type': 'connected', 'data': domain})
-    await send(ws, {'type': 'nodelist', 'data': {'nodes': list(ws_node.nodes)}})
+async def handler(ws, _):
+    await send(ws, 'connected', domain)
+    await send(ws, 'nodelist', {'nodes': list(ws_node.nodes)})
     while True:
         try:
             message = json.loads(await ws.recv())
@@ -57,18 +60,18 @@ async def handle_message(ws, message):
     }
     if message_type in switcher:
         try:
-            if 'data' in message and message['data']:
+            if 'data' in message and message['data'] is not None:
                 res = await switcher[message_type](**message['data'])
             else:
                 res = await switcher[message_type]()
             if res is not None:
-                await send(ws, {'type': res[0], 'data': res[1]})
+                await send(ws, *res)
         except Exception as e:
             print(e)
             print(traceback.format_exc())
-            await send(ws, {'type': 'error', 'data': e.__repr__()})
+            await send(ws, 'error', e.__repr__())
     else:
-        await send(ws, {'type': 'error', 'data': 'wrong message type'})
+        await send(ws, 'error', 'wrong message type')
 
 
 async def connect_nodes(nodes):
@@ -137,8 +140,7 @@ async def add_block(block) -> (str, Any):
         await ws_node.share_block(block)
         ws_node.mem_pool -= set(map(Transaction.parse_obj, block.payload['transactions']))
     elif status in (AddBlockStatus.VERIFICATION_FAILED, AddBlockStatus.CURRENT_CHAIN_TOO_SHORT):
-        pass
-        # ws_node.get_longest_chain()
+        await ws_node.pull_longest_chain()
     res = switcher[status]
     return res
 

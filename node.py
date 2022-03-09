@@ -46,9 +46,9 @@ class Node:
         inputs = [(node, olds + news) for node in news] + [(node, news) for node in olds]
         if len(news) > 1 or (len(news) > 0 and self.ip not in news):
             with ThreadPoolExecutor(len(inputs)) as executor:
-                futures = [executor.submit(self.share_nodes, *args) for args in inputs]
+                [executor.submit(self.share_nodes, *args) for args in inputs]
                 # [f.result() for f in futures]  # not necessary and too slow for network
-        with ThreadPoolExecutor(len(nodes)) as executor:
+        with ThreadPoolExecutor(1) as executor:
             executor.submit(self.get_longest_chain)
 
     def share_nodes(self, node: str, nodes: List[str]) -> bool:
@@ -61,7 +61,7 @@ class Node:
                     pass
         return False
 
-    def get_longest_chain(self, nodes: List[str] = None) -> bool:
+    def get_longest_chain(self, nodes: List[str] = None):
         if not nodes:
             nodes = self.node_list
         futures = self.broadcast_get('get_blockchain_len', nodes)
@@ -76,10 +76,8 @@ class Node:
                     start = i
                     break
             blockchain_data = requests.get(f'http://{longest_node}/get_blockchain?start={start}').json()
-            self.blockchain.blocks = [Block.parse_obj(block_data['block']) for block_data in
-                                      blockchain_data['chain']]
-            return True
-        return False
+            self.blockchain.blocks[start:] = [Block.parse_obj(block_data['block']) for block_data in
+                                              blockchain_data['chain']]
 
     def share_block(self, block: Block, nodes: List[str] = None) -> None:
         print('share')

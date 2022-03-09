@@ -1,5 +1,5 @@
 import asyncio
-from typing import List, Any, Set, Dict, Iterator
+from typing import List, Any, Set, Dict
 
 import orjson
 import websockets
@@ -10,10 +10,16 @@ from block import Block
 from transaction import Transaction
 
 
-async def send(websocket: WebSocketServerProtocol, message: Any, need_result=False) -> bytes | None:
+async def send(websocket: WebSocketServerProtocol, _type: str, data: Any = None) -> Any:
     try:
-        await websocket.send(orjson.dumps(message))
-        await websocket.recv()
+        msg = {'type': _type}
+        if data is not None:
+            msg['data'] = data
+        print('nO', msg)
+        await websocket.send(orjson.dumps(msg))
+        response = await websocket.recv()
+        print('nI', response)
+        return orjson.loads(response)
     except websockets.ConnectionClosed:
         pass
 
@@ -26,13 +32,8 @@ class WsNode:
         self.blockchain: Blockchain = Blockchain()
         self.mem_pool: Set[Transaction] = set()
 
-    async def broadcast(self, message: Any, need_result=False):#
-        # for ws in self.connects.values():
-        #     await ws.send(orjson.dumps(message))
-        # for ws in self.connects.values():
-        #     resp = await ws.recv()
-
-        return await asyncio.gather(*[send(ws, message) for ws in self.connects.values()])
+    async def broadcast(self, _type: str, data: Any = None):
+        return await asyncio.gather(*[send(ws, _type, data) for ws in self.connects.values()])
 
     async def connect_nodes(self, nodes: List[str]):
         olds = [self.ip] + self.node_list
@@ -46,21 +47,33 @@ class WsNode:
             self.connects[node] = websocket
         inputs = [(node, olds + news) for node in news] + [(node, news) for node in olds]
         if len(news) > 1 or (len(news) > 0 and self.ip not in news):
-            # await self.broadcast({'type': 'connect_nodes', 'data': {'nodes': self.node_list}})
-            # [asyncio.get_event_loop().create_task(self.share_nodes(*args)) for args in inputs]
             await asyncio.gather(*[self.share_nodes(*args) for args in inputs])
-
-        # with ThreadPoolExecutor(len(nodes)) as executor:
-        #     executor.submit(self.get_longest_chain)
 
     async def share_nodes(self, node: str, nodes: List[str]):
         print('share', nodes, 'to', node)
         if node != self.ip:
             ws = self.connects[node]
-            await send(ws, {'type': 'connect_nodes', 'data': {'nodes': nodes}})
+            await send(ws, 'connect_nodes', {'nodes': nodes})
 
     async def share_block(self, block: Block) -> None:
-        await self.broadcast({'type': 'add_block', 'data': {'block': block.dict()}})
+        await self.broadcast('add_block', {'block': block.dict()})
+
+    async def pull_longest_chain(self, nodes: List[str] = None):
+        nodes = nodes or self.nodes
+        lens = list(map(lambda x: x['data'], await self.broadcast('get_blockchain_len')))
+        print('lens', lens)
+        longest = max(lens)
+        ws = self.connects[nodes[lens.index(longest)]]
+        if longest > len(self.blockchain):
+            hashes: List[str] = await send(ws, 'get_blockchain_hashes')
+            start = 0
+            for i, (a, b) in enumerate(zip(hashes, self.blockchain.hashes)):
+                if a != b:
+                    start = i
+                    break
+            blockchain_data: Dict = await send(ws, 'get_blockchain', {'start': start})
+            self.blockchain.blocks[start:] = [Block.parse_obj(block_data['block']) for block_data in
+                                              blockchain_data['chain']]
 
     @property
     def blockchain_len(self) -> int:

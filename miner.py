@@ -40,7 +40,9 @@ def mine():
         print(previous_block)
         print(mem_pool)
         print('diff', difficulty)
-        block = Block(id=previous_block['block']['id'] + 1, previous=previous_block['hash'], payload={'transactions': [transaction for transaction in mem_pool]})
+        block = Block(id=previous_block['block']['id'] + 1,
+                      previous=previous_block['hash'],
+                      payload={'transactions': [transaction for transaction in mem_pool]})
         while not block.hash.startswith("0" * difficulty):
             block.nonce += 1
             block.timestamp = int(time.time())
