@@ -1,6 +1,7 @@
 import asyncio
 import json
 import socket
+import time
 import traceback
 from typing import Any, List, Dict
 
@@ -65,7 +66,10 @@ async def handle_message(ws, message):
             else:
                 res = await switcher[message_type]()
             if res is not None:
-                await send(ws, *res)
+                if type(res) == tuple:
+                    await send(ws, *res)
+                else:
+                    await send(ws, res)
         except Exception as e:
             print(e)
             print(traceback.format_exc())
@@ -75,7 +79,8 @@ async def handle_message(ws, message):
 
 
 async def connect_nodes(nodes):
-    return 'connect_nodes', await ws_node.connect_nodes(nodes)
+    await ws_node.connect_nodes(nodes)
+    return 'connect_nodes'
 
 
 async def get_connected_nodes():
@@ -128,29 +133,37 @@ async def verify_blockchain():
 async def add_block(block) -> (str, Any):
     block = Block.parse_obj(block)
     switcher = {
-        AddBlockStatus.OK: ('block_added', None),
-        AddBlockStatus.EXIST: ('block_exist', None),
-        AddBlockStatus.VERIFICATION_FAILED: ('block_verification_failed', None),
+        AddBlockStatus.OK: 'block_added',
+        AddBlockStatus.EXIST: 'block_exist',
+        AddBlockStatus.VERIFICATION_FAILED: 'block_verification_failed',
         AddBlockStatus.CURRENT_CHAIN_LONGER: ('current_longer', ws_node.blockchain_len),
         AddBlockStatus.CURRENT_CHAIN_TOO_SHORT: ('current_short', ws_node.blockchain_len),
     }
     status = ws_node.blockchain.add_block(block)
 
     if status == AddBlockStatus.OK:
+        for transaction in block.payload['transactions']:
+            print('remove', transaction)
+            ws_node.mem_pool.discard(Transaction.parse_obj(transaction))
+            print(ws_node.mem_pool)
         await ws_node.share_block(block)
-        ws_node.mem_pool -= set(map(Transaction.parse_obj, block.payload['transactions']))
     elif status in (AddBlockStatus.VERIFICATION_FAILED, AddBlockStatus.CURRENT_CHAIN_TOO_SHORT):
         await ws_node.pull_longest_chain()
     res = switcher[status]
     return res
 
 
-async def add_transaction():
-    pass
+async def add_transaction(transaction) -> (str, Any):
+    transaction = Transaction.parse_obj(transaction)
+    if transaction.timestamp == 0:
+        transaction.timestamp = int(time.time())
+    await ws_node.add_transaction(transaction)
+    return 'transaction_added'
 
 
 async def get_transactions():
-    pass
+    mem_pool = list(map(lambda x: x.dict(), ws_node.mem_pool_list))
+    return 'transactions', {'transactions': mem_pool, 'count': len(mem_pool)}
 
 
 async def get_mem_pool() -> (str, List[Dict]):

@@ -49,7 +49,6 @@ class WsNode:
         if message_type in switcher:
             if 'data' in message and message['data'] is not None:
                 data = message['data']
-                print(data)
                 if type(data) == dict:
                     res = await switcher[message_type](**data)
                 else:
@@ -63,9 +62,7 @@ class WsNode:
                     await send(ws, res)
 
     async def broadcast(self, _type: str, data: Any = None, nodes: List[str] = None) -> None:
-        print('broadcast')
         sockets = self.connects.values() if nodes is None else [self.connects[node] for node in nodes]
-        print(sockets)
         await asyncio.gather(*[send(ws, _type, data) for ws in sockets])
 
     async def connect_nodes(self, nodes: List[str]):
@@ -88,12 +85,17 @@ class WsNode:
             ws = self.connects[node]
             await send(ws, 'connect_nodes', {'nodes': nodes})
 
-    async def share_block(self, block: Block) -> None:
+    async def share_block(self, block: Block):
         await self.broadcast('add_block', {'block': block.dict()})
 
     async def pull_longest_chain(self, nodes: List[str] = None):
-        print('pulling')
         await self.broadcast('get_blockchain_len', nodes=nodes)
+
+    async def add_transaction(self, transaction: Transaction):
+        if transaction in self.mem_pool:
+            return
+        self.mem_pool.add(transaction)
+        await self.broadcast('add_transaction', {'transaction': transaction.dict()})
 
     @property
     def blockchain_len(self) -> int:
@@ -108,7 +110,6 @@ class WsNode:
         return list(self.mem_pool)
 
     async def handle_blockchain_len(self, length: int) -> str:
-        print('handle_blockchain_len')
         if length > self.blockchain_len:
             return 'get_blockchain_hashes'
 

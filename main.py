@@ -91,14 +91,14 @@ def get_blockchain_hashes():
 @app.post('/add_transaction', status_code=201, tags=['Transactions'])
 def add_transaction(transaction: Transaction):
     if transaction.timestamp == 0:
-        transaction.timestamp = time.time()
+        transaction.timestamp = int(time.time())
     node.add_transaction(transaction)
     return 'ok'
 
 
 @app.get('/get_transactions', tags=['Transactions'])
 def get_transactions():
-    mem_pool = list(node.mem_pool)
+    mem_pool = node.mem_pool_list
     return {'transactions': mem_pool, 'count': len(mem_pool)}
 
 

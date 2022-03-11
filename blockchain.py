@@ -19,7 +19,7 @@ class Blockchain:
 
     def add_block(self, block: Block) -> AddBlockStatus:
         if block.id == len(self):
-            if block.previous == self.last_hash and block.hash.startswith("0" * self.difficulty):
+            if block.previous == self.last_hash: # and block.hash.startswith("0" * self.difficulty):
                 self.blocks.append(block)
                 return AddBlockStatus.OK
             else:

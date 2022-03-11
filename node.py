@@ -90,7 +90,7 @@ class Node:
         if transaction in self.mem_pool:
             return False
         self.mem_pool.add(transaction)
-        self.broadcast_post('add_transaction', vars(transaction))
+        self.broadcast_post('add_transaction', transaction.dict())
         return True
 
     @property
