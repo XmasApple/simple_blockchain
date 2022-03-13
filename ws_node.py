@@ -8,17 +8,7 @@ from websockets import WebSocketServerProtocol
 from blockchain import Blockchain
 from block import Block
 from transaction import Transaction
-
-
-async def send(websocket: WebSocketServerProtocol, _type: str, data: Any = None) -> None:
-    try:
-        msg = {'type': _type}
-        if data is not None:
-            msg['data'] = data
-        print('nO', msg)
-        await websocket.send(orjson.dumps(msg))
-    except websockets.ConnectionClosed:
-        pass
+from utils import send, handle
 
 
 class WsNode:
@@ -40,26 +30,12 @@ class WsNode:
                 break
 
     async def handle(self, ws, message):
-        print('nI', message)
         switcher = {
             'blockchain_len': self.handle_blockchain_len,
+            'blockchain': self.handle_blockchain,
             'hashes': self.handle_hashes,
         }
-        message_type = message['type']
-        if message_type in switcher:
-            if 'data' in message and message['data'] is not None:
-                data = message['data']
-                if type(data) == dict:
-                    res = await switcher[message_type](**data)
-                else:
-                    res = await switcher[message_type](data)
-            else:
-                res = await switcher[message_type]()
-            if res is not None:
-                if type(res) == tuple:
-                    await send(ws, *res)
-                else:
-                    await send(ws, res)
+        await handle(switcher, ws, message)
 
     async def broadcast(self, _type: str, data: Any = None, nodes: List[str] = None) -> None:
         sockets = self.connects.values() if nodes is None else [self.connects[node] for node in nodes]

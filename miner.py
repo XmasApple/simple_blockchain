@@ -47,7 +47,7 @@ def mine():
             block.nonce += 1
             block.timestamp = int(time.time())
         print(block)
-        print([future.result().json() for future in broadcast_post('add_block', vars(block))])
+        print([future.result().json() for future in broadcast_post('add_block', block.dict())])
 
 
 if __name__ == '__main__':

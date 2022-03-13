@@ -3,7 +3,7 @@ import json
 import socket
 import time
 import traceback
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Set
 
 import orjson
 import websockets
@@ -26,14 +26,22 @@ async def send(ws, _type: str, data: Any = None):
         pass
 
 
-async def handler(ws, _):
+async def broadcast_miners(_type: str, data: Any = None):
+    await asyncio.gather(*[send(ws, _type, data) for ws in miners])
+
+
+async def handler(ws, path):
+    print(path)
+    if path == '/miner':
+        miners.add(ws)
     await send(ws, 'connected', domain)
-    await send(ws, 'nodelist', {'nodes': list(ws_node.nodes)})
     while True:
         try:
             message = json.loads(await ws.recv())
             await handle_message(ws, message)
         except(ConnectionClosedError, ConnectionClosedOK):
+            if ws in miners:
+                miners.remove(ws)
             break
         except Exception as e:
             print(type(e))
@@ -58,6 +66,7 @@ async def handle_message(ws, message):
         'add_transaction': add_transaction,
         'get_transactions': get_transactions,
         'get_mem_pool': get_mem_pool,
+        'pull_longest_chain': pull_longest_chain,
     }
     if message_type in switcher:
         try:
@@ -97,7 +106,7 @@ async def get_block(block_id) -> (str, dict):
 
 async def get_last_block() -> (str, dict):
     block = ws_node.blockchain.blocks[-1]
-    return 'block', {'block': block.dict(), 'hash': block.hash}
+    return 'last_block', {'block': block.dict(), 'block_hash': block.hash}
 
 
 async def get_blockchain_difficulty() -> (str, int):
@@ -109,6 +118,10 @@ async def get_blockchain(start: int = 0) -> (str, dict):
         'chain': list(map(lambda x: {'block': x.dict(), 'hash': x.hash}, ws_node.blockchain.blocks[start:])),
         'length': len(ws_node.blockchain.blocks)
     }
+
+
+async def pull_longest_chain():
+    await ws_node.pull_longest_chain()
 
 
 async def get_blockchain_len() -> (str, int):
@@ -147,6 +160,7 @@ async def add_block(block) -> (str, Any):
             ws_node.mem_pool.discard(Transaction.parse_obj(transaction))
             print(ws_node.mem_pool)
         await ws_node.share_block(block)
+        await broadcast_miners('add_block', {'block': block.dict()})
     elif status in (AddBlockStatus.VERIFICATION_FAILED, AddBlockStatus.CURRENT_CHAIN_TOO_SHORT):
         await ws_node.pull_longest_chain()
     res = switcher[status]
@@ -176,6 +190,7 @@ async def main():
 
 
 if __name__ == '__main__':
+    miners: Set = set()
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.connect(("8.8.8.8", 80))
     host = s.getsockname()[0]
